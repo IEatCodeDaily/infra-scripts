@@ -1,8 +1,10 @@
+# IEatCodeDaily zshrc: https://raw.githubusercontent.com/IEatCodeDaily/infra-scripts/main/config/.zshrc
+
 # Path to Oh My Zsh installation
 export ZSH="$HOME/.oh-my-zsh"
 
-# Set theme - agnoster is a nice built-in theme with powerline-like features
-ZSH_THEME="agnoster"
+# Set theme
+ZSH_THEME="jonathan"
 
 # Enable command correction
 ENABLE_CORRECTION="true"
@@ -51,7 +53,7 @@ source ~/.zsh/zsh-autosuggestions/zsh-autosuggestions.zsh
 # Load zsh-syntax-highlighting (must be at the end)
 source ~/.zsh/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
 
-# Set up tab completion menu behavior (similar to PowerShell's MenuComplete)
+# Set up tab completion menu behavior
 zstyle ':completion:*' menu select
 zstyle ':completion:*' list-colors ${(s.:.)LS_COLORS}
 
@@ -59,15 +61,14 @@ zstyle ':completion:*' list-colors ${(s.:.)LS_COLORS}
 HISTSIZE=10000
 SAVEHIST=10000
 HISTFILE=~/.zsh_history
-setopt SHARE_HISTORY         # Share history between sessions
-setopt EXTENDED_HISTORY      # Add timestamps to history
-setopt HIST_IGNORE_ALL_DUPS  # Don't record duplicates
-setopt HIST_FIND_NO_DUPS     # Don't show duplicates in search
+setopt SHARE_HISTORY
+setopt EXTENDED_HISTORY
+setopt HIST_IGNORE_ALL_DUPS
+setopt HIST_FIND_NO_DUPS
 
 # Enable directory navigation with just the directory name
 setopt autocd
 
-# Key bindings
-bindkey '^[[A' up-line-or-search       # Up arrow for history search
-bindkey '^[[B' down-line-or-search     # Down arrow for history search
-bindkey '^[[Z' reverse-menu-complete   # Shift+Tab to go backwards in completion menu
+# Key bindings - simple version less likely to cause encoding issues
+bindkey '^[[A' up-line-or-search
+bindkey '^[[B' down-line-or-search
