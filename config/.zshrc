@@ -28,9 +28,6 @@ source $ZSH/oh-my-zsh.sh
 # User configuration
 export LANG=en_US.UTF-8
 
-# Add Cargo to PATH (for Rust and Yazi)
-export PATH="$HOME/.cargo/bin:$PATH"
-
 # Aliases
 alias ll='ls -alF'
 alias la='ls -A'
@@ -38,7 +35,7 @@ alias l='ls -CF'
 alias ..='cd ..'
 alias ...='cd ../..'
 alias vi='vim'
-alias fm='yazi'  # yazi file manager
+alias fm='ranger'  # ranger file manager
 
 # Check if bat is installed as batcat (Debian) and create alias
 if command -v batcat >/dev/null 2>&1; then

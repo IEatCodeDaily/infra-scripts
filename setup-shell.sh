@@ -2,7 +2,7 @@
 
 # Complete Terminal Setup Script
 # This script installs and configures a terminal environment with tmux, zsh,
-# yazi file manager, and other useful shell tools.
+# ranger file manager, and other useful shell tools.
 
 # Allow some commands to fail without exiting the script
 set -o pipefail  # Safer pipe handling
@@ -45,29 +45,9 @@ apt-get update || {
 print_message "Installing basic tools..."
 apt-get install -y git curl wget build-essential unzip
 
-# Install Rust (required for Yazi)
-print_message "Installing Rust (required for Yazi)..."
-if [ -n "$SUDO_USER" ]; then
-    su - $SUDO_USER -c "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y"
-    # Add Cargo to PATH for this session
-    export PATH="$USER_HOME/.cargo/bin:$PATH"
-else
-    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-    # Add Cargo to PATH for this session
-    export PATH="$HOME/.cargo/bin:$PATH"
-fi
-
-# Install Yazi file manager
-print_message "Installing Yazi file manager..."
-if [ -n "$SUDO_USER" ]; then
-    su - $SUDO_USER -c "source $USER_HOME/.cargo/env && cargo install --locked yazi-fm"
-else
-    source $HOME/.cargo/env && cargo install --locked yazi-fm
-fi
-
-# Install dependencies for Yazi
-print_message "Installing Yazi dependencies for preview capabilities..."
-apt-get install -y ffmpegthumbnailer unar jq poppler-utils fd-find
+# Install ranger file manager and dependencies for preview capabilities
+print_message "Installing ranger file manager and dependencies..."
+apt-get install -y ranger highlight caca-utils atool w3m poppler-utils mediainfo
 
 # Install tmux
 print_message "Installing tmux..."
@@ -152,9 +132,22 @@ fi
 curl -fsSL https://raw.githubusercontent.com/IEatCodeDaily/infra-scripts/main/config/.zshrc -o "${USER_HOME}/.zshrc"
 curl -fsSL https://raw.githubusercontent.com/IEatCodeDaily/infra-scripts/main/config/.tmux.conf -o "${USER_HOME}/.tmux.conf"
 
-# Create Yazi configuration directory and download config
-mkdir -p "${USER_HOME}/.config/yazi"
-curl -fsSL https://raw.githubusercontent.com/IEatCodeDaily/infra-scripts/main/config/yazi.toml -o "${USER_HOME}/.config/yazi/yazi.toml"
+# Create ranger configuration directory
+mkdir -p "${USER_HOME}/.config/ranger"
+
+# Generate default ranger configuration (if it doesn't exist)
+if [ -n "$SUDO_USER" ]; then
+    su - $SUDO_USER -c "ranger --copy-config=all"
+else
+    ranger --copy-config=all
+fi
+
+# Add fm alias for ranger to .zshrc if it doesn't exist
+if ! grep -q "alias fm='ranger'" "${USER_HOME}/.zshrc"; then
+    print_message "Adding ranger alias to .zshrc..."
+    echo "# Ranger file manager alias" >> "${USER_HOME}/.zshrc"
+    echo "alias fm='ranger'" >> "${USER_HOME}/.zshrc"
+fi
 
 # If any download fails, use local default config
 if [ ! -f "${USER_HOME}/.zshrc" ]; then
@@ -190,9 +183,6 @@ source $ZSH/oh-my-zsh.sh
 # User configuration
 export LANG=en_US.UTF-8
 
-# Add Cargo to PATH (for Rust and Yazi)
-export PATH="$HOME/.cargo/bin:$PATH"
-
 # Aliases
 alias ll='ls -alF'
 alias la='ls -A'
@@ -200,7 +190,7 @@ alias l='ls -CF'
 alias ..='cd ..'
 alias ...='cd ../..'
 alias vi='vim'
-alias fm='yazi'  # yazi file manager
+alias fm='ranger'  # ranger file manager
 
 # Check if bat is installed as batcat (Debian) and create alias
 if command -v batcat >/dev/null 2>&1; then
@@ -244,8 +234,7 @@ if [ -n "$SUDO_USER" ]; then
     print_message "Setting correct ownership of files..."
     chown -R $SUDO_USER:$SUDO_USER ${USER_HOME}/.oh-my-zsh
     chown -R $SUDO_USER:$SUDO_USER ${USER_HOME}/.zsh
-    chown -R $SUDO_USER:$SUDO_USER ${USER_HOME}/.cargo
-    chown -R $SUDO_USER:$SUDO_USER ${USER_HOME}/.config/yazi
+    chown -R $SUDO_USER:$SUDO_USER ${USER_HOME}/.config/ranger
     chown $SUDO_USER:$SUDO_USER ${USER_HOME}/.zshrc
     chown $SUDO_USER:$SUDO_USER ${USER_HOME}/.tmux.conf
 fi
@@ -260,4 +249,4 @@ fi
 
 print_message "Installation complete! Log out and log back in to start using zsh."
 print_message "Or run the following command to start zsh now: exec zsh"
-print_message "To use the Yazi file manager, type 'fm' or 'yazi'"
+print_message "To use the ranger file manager, type 'fm' or 'ranger'"
