@@ -1,0 +1,17 @@
+# File: vars/rancher.yml
+# Variables for Rancher deployment
+
+# Rancher configuration
+rancher_namespace: cattle-system
+rancher_hostname: rancher.k3s.home  # Change to your preferred hostname
+rancher_admin_password: bluechocolate  # Change to a secure password
+rancher_version: v2.10.3
+rancher_replicas: 2
+
+# Use self-signed certificates for simplicity
+# Options: rancher (self-signed), letsEncrypt, secret
+tls_source: rancher  
+
+# For NodePort access (alternative to Ingress)
+# Set to true if you're having issues with Ingress
+use_nodeport: false

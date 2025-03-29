@@ -1,0 +1,50 @@
+
+- name: Check swap status on K3s nodes
+  hosts: k3s_cluster
+  become: true
+  gather_facts: true
+  
+  tasks:
+    - name: Get current swap status
+      shell: free -h | grep -i swap
+      register: swap_status
+      changed_when: false
+      
+    - name: Check if swap is enabled in /etc/fstab
+      shell: grep -v '^#' /etc/fstab | grep -i swap
+      register: fstab_swap
+      changed_when: false
+      failed_when: false
+      
+    - name: Show swap status for {{ inventory_hostname }}
+      debug:
+        msg: 
+          - "Node: {{ inventory_hostname }} ({{ ansible_host }})"
+          - "Current swap usage: {{ swap_status.stdout }}"
+          - "Swap in fstab: {{ 'Yes (needs fixing)' if fstab_swap.rc == 0 else 'No (good)' }}"
+          
+    - name: Check swappiness value
+      shell: cat /proc/sys/vm/swappiness
+      register: swappiness
+      changed_when: false
+      
+    - name: Show swappiness value
+      debug:
+        msg: "Swappiness value: {{ swappiness.stdout }} (should be 0)"
+        
+    - name: Check for swap files
+      find:
+        paths: /
+        patterns: "swapfile,*.swap"
+        file_type: file
+        recurse: no
+      register: swap_files
+      
+    - name: Show swap files if found
+      debug:
+        msg: "Swap files found: {{ swap_files.files | map(attribute='path') | list }}"
+      when: swap_files.files | length > 0
+      
+    - name: Summary of swap status
+      debug:
+        msg: "{{ inventory_hostname }} swap status: {{ 'DISABLED (good)' if swap_status.stdout.find('0B') != -1 and fstab_swap.rc != 0 and swappiness.stdout == '0' else 'ENABLED (needs fixing)' }}"

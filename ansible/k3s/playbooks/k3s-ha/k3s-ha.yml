@@ -1,0 +1,208 @@
+---
+# File: k3s-ha.yml
+# Description: Configures high availability for K3s cluster with kube-vip and MetalLB
+
+- name: Configure High Availability for K3s
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - vars/k3s-ha.yml
+  
+  tasks:
+    #
+    # Preparation and checks
+    #
+    - name: Check if kubectl is installed
+      command: which kubectl
+      register: kubectl_check
+      failed_when: kubectl_check.rc != 0
+      changed_when: false
+
+    - name: Check kubectl connection to cluster
+      command: kubectl get nodes
+      register: kubectl_get_nodes
+      failed_when: kubectl_get_nodes.rc != 0
+      changed_when: false
+      
+    - name: Get list of server nodes
+      shell: kubectl get nodes -l node-role.kubernetes.io/master=true -o jsonpath='{.items[*].metadata.name}'
+      register: server_nodes
+      changed_when: false
+      
+    - name: Show detected server nodes
+      debug:
+        msg: "Detected server nodes: {{ server_nodes.stdout }}"
+        
+    #
+    # Create RBAC for kube-vip
+    #
+    - name: Create kube-vip service account
+      shell: kubectl create serviceaccount kube-vip -n kube-system --dry-run=client -o yaml | kubectl apply -f -
+      changed_when: true
+      
+    - name: Create kube-vip ClusterRole manifest
+      copy:
+        dest: ./k3s-ha-manifests/kube-vip-role.yaml
+        content: |
+          apiVersion: rbac.authorization.k8s.io/v1
+          kind: ClusterRole
+          metadata:
+            name: system:kube-vip-role
+          rules:
+            - apiGroups: [""]
+              resources: ["services", "services/status", "nodes", "endpoints"]
+              verbs: ["list", "get", "watch", "update"]
+            - apiGroups: ["coordination.k8s.io"]
+              resources: ["leases"]
+              verbs: ["list", "get", "watch", "update", "create"]
+        mode: '0644'
+        
+    - name: Create kube-vip ClusterRoleBinding manifest
+      copy:
+        dest: ./k3s-ha-manifests/kube-vip-rolebinding.yaml
+        content: |
+          apiVersion: rbac.authorization.k8s.io/v1
+          kind: ClusterRoleBinding
+          metadata:
+            name: system:kube-vip-binding
+          roleRef:
+            apiGroup: rbac.authorization.k8s.io
+            kind: ClusterRole
+            name: system:kube-vip-role
+          subjects:
+          - kind: ServiceAccount
+            name: kube-vip
+            namespace: kube-system
+        mode: '0644'
+        
+    - name: Apply kube-vip ClusterRole
+      command: kubectl apply -f ./k3s-ha-manifests/kube-vip-role.yaml
+      changed_when: true
+      
+    - name: Apply kube-vip ClusterRoleBinding
+      command: kubectl apply -f ./k3s-ha-manifests/kube-vip-rolebinding.yaml
+      changed_when: true
+    
+    #
+    # Deploy kube-vip for control plane HA
+    #
+    - name: Create directory for kube-vip manifests
+      file:
+        path: ./k3s-ha-manifests
+        state: directory
+        mode: '0755'
+        
+    - name: Create kube-vip DaemonSet manifest
+      template:
+        src: templates/kube-vip.yaml.j2
+        dest: ./k3s-ha-manifests/kube-vip.yaml
+        mode: '0644'
+        
+    - name: Apply kube-vip DaemonSet
+      command: kubectl apply -f ./k3s-ha-manifests/kube-vip.yaml
+      register: kubevip_ds_result
+      changed_when: kubevip_ds_result.rc == 0
+      
+    - name: Wait for kube-vip pods to be ready
+      shell: kubectl wait --namespace kube-system --for=condition=ready pod --selector=name=kube-vip --timeout=90s
+      register: kubevip_wait_result
+      changed_when: false
+      failed_when: false
+      retries: 10
+      delay: 10
+      until: kubevip_wait_result.rc == 0
+      
+    #
+    # Deploy MetalLB for service load balancing
+    #
+    - name: Apply MetalLB manifests
+      command: kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/{{ metallb_version }}/config/manifests/metallb-native.yaml
+      register: metallb_result
+      changed_when: metallb_result.rc == 0
+      
+    - name: Wait for MetalLB components to be ready
+      shell: kubectl wait --namespace metallb-system --for=condition=ready pod --selector=app=metallb --timeout=120s
+      register: metallb_wait_result
+      changed_when: false
+      retries: 10
+      delay: 10
+      until: metallb_wait_result.rc == 0
+      failed_when: false
+      
+    - name: Create MetalLB IP address pool manifest
+      template:
+        src: templates/metallb-config.yaml.j2
+        dest: ./k3s-ha-manifests/metallb-config.yaml
+        mode: '0644'
+        
+    - name: Apply MetalLB configuration
+      command: kubectl apply -f ./k3s-ha-manifests/metallb-config.yaml
+      register: metallb_config_result
+      changed_when: metallb_config_result.rc == 0
+      
+    #
+    # Configure Rancher to use LoadBalancer (if installed)
+    #
+    - name: Check if Rancher is installed
+      command: kubectl get deployment rancher -n cattle-system
+      register: rancher_check
+      changed_when: false
+      failed_when: false
+      
+    - name: Update Rancher to use LoadBalancer (if installed)
+      command: >
+        helm upgrade --install rancher rancher-stable/rancher 
+        --namespace cattle-system 
+        --set hostname={{ rancher_hostname }} 
+        --set replicas={{ rancher_replicas }} 
+        --set service.type=LoadBalancer 
+        --set bootstrapPassword={{ rancher_password }}
+      when: rancher_check.rc == 0
+      register: rancher_update
+      changed_when: rancher_update.rc == 0
+      
+    #
+    # Verify and get status
+    #
+    - name: Get kube-vip status
+      shell: kubectl get pods -n kube-system -l name=kube-vip -o wide
+      register: kubevip_status
+      changed_when: false
+      
+    - name: Display kube-vip status
+      debug:
+        msg: "{{ kubevip_status.stdout_lines }}"
+        
+    - name: Get MetalLB status
+      shell: kubectl get pods -n metallb-system -o wide
+      register: metallb_status
+      changed_when: false
+      
+    - name: Display MetalLB status
+      debug:
+        msg: "{{ metallb_status.stdout_lines }}"
+        
+    - name: Get LoadBalancer services (wait for IP assignment)
+      shell: kubectl get svc --all-namespaces -o wide | grep LoadBalancer
+      register: lb_services
+      until: lb_services.stdout.find("pending") == -1
+      retries: 10
+      delay: 10
+      changed_when: false
+      failed_when: false
+      
+    - name: Display LoadBalancer services
+      debug:
+        msg: "{{ lb_services.stdout_lines }}"
+        
+    - name: Provide VIP information
+      debug:
+        msg: 
+          - "High Availability setup complete!"
+          - "----------------------------------------"
+          - "API Endpoint VIP: {{ vip_address }}"
+          - "You can now access your cluster using:"
+          - "kubectl config set-cluster my-cluster --server=https://{{ vip_address }}:6443"
+          - "----------------------------------------"
+          - "Service LoadBalancers will use IPs from: {{ metallb_ip_range }}"

@@ -1,0 +1,143 @@
+---
+# File: deploy-rancher.yml
+# Description: Deploys Rancher Manager on a K3s Kubernetes cluster
+
+- name: Deploy Rancher on K3s
+  hosts: localhost  # This will run on your local machine where kubectl is configured
+  connection: local
+  gather_facts: false
+  vars_files:
+    - vars/rancher.yml
+  vars:
+    cert_manager_version: v1.14.3
+    k8s_kubeconfig: ~/.kube/config
+
+  tasks:
+    - name: Check if kubectl is available
+      command: which kubectl
+      register: kubectl_check
+      failed_when: kubectl_check.rc != 0
+      changed_when: false
+
+    - name: Check kubectl connection to cluster
+      command: kubectl get nodes
+      register: kubectl_get_nodes
+      failed_when: kubectl_get_nodes.rc != 0
+      changed_when: false
+
+    - name: Ensure helm is installed
+      command: which helm
+      register: helm_check
+      failed_when: helm_check.rc != 0
+      changed_when: false
+
+    - name: Add Jetstack Helm repo (cert-manager)
+      command: helm repo add jetstack https://charts.jetstack.io
+      changed_when: true
+
+    - name: Add Rancher Helm repo
+      command: helm repo add rancher-stable https://releases.rancher.com/server-charts/stable
+      changed_when: true
+
+    - name: Update Helm repos
+      command: helm repo update
+      changed_when: true
+
+    - name: Create cattle-system namespace if it doesn't exist
+      shell: kubectl create namespace {{ rancher_namespace }} --dry-run=client -o yaml | kubectl apply -f -
+      changed_when: true
+
+    - name: Create cert-manager namespace if it doesn't exist
+      shell: kubectl create namespace cert-manager --dry-run=client -o yaml | kubectl apply -f -
+      changed_when: true
+
+    - name: Apply cert-manager CRDs
+      command: >
+        kubectl apply -f 
+        https://github.com/cert-manager/cert-manager/releases/download/{{ cert_manager_version }}/cert-manager.crds.yaml
+      changed_when: true
+
+    - name: Install cert-manager
+      command: >
+        helm upgrade --install cert-manager jetstack/cert-manager
+        --namespace cert-manager
+        --version {{ cert_manager_version }}
+        --wait
+      changed_when: true
+
+    - name: Wait for cert-manager to be ready
+      command: kubectl -n cert-manager rollout status deployment/cert-manager
+      register: cert_manager_status
+      retries: 10
+      delay: 30
+      until: cert_manager_status.rc == 0
+      changed_when: false
+
+    - name: Install Rancher with Ingress (default)
+      command: >
+        helm upgrade --install rancher rancher-stable/rancher
+        --namespace {{ rancher_namespace }}
+        --set hostname={{ rancher_hostname }}
+        --set bootstrapPassword={{ rancher_admin_password }}
+        --set replicas={{ rancher_replicas }}
+        --set ingress.tls.source={{ tls_source }}
+      register: rancher_install
+      when: not use_nodeport|bool
+      failed_when: false
+      changed_when: true
+
+    - name: Install Rancher with NodePort (alternative)
+      command: >
+        helm upgrade --install rancher rancher-stable/rancher
+        --namespace {{ rancher_namespace }}
+        --set hostname={{ rancher_hostname }}
+        --set bootstrapPassword={{ rancher_admin_password }}
+        --set replicas={{ rancher_replicas }}
+        --set ingress.tls.source={{ tls_source }}
+        --set service.type=NodePort
+      register: rancher_install_nodeport
+      when: use_nodeport|bool or rancher_install.rc != 0
+      changed_when: true
+
+    - name: Wait for Rancher rollout
+      command: kubectl -n {{ rancher_namespace }} rollout status deployment/rancher
+      retries: 20
+      delay: 30
+      register: rancher_status
+      until: rancher_status.rc == 0
+      changed_when: false
+
+    - name: Get Rancher URL
+      command: >
+        kubectl get ingress -n {{ rancher_namespace }} rancher -o 
+        jsonpath="{.spec.rules[0].host}{':'}{.spec.rules[0].http.paths[0].path}"
+      register: rancher_url
+      changed_when: false
+
+    - name: Get NodePort for Rancher (if applicable)
+      command: kubectl get -n {{ rancher_namespace }} -o jsonpath='{.spec.ports[0].nodePort}' service rancher
+      register: nodeport_result
+      when: use_nodeport|bool or rancher_install.rc != 0
+      failed_when: false
+      changed_when: false
+
+    - name: Get server node IP
+      command: kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}'
+      register: node_ip
+      changed_when: false
+
+    - name: Display Rancher access information
+      debug:
+        msg: 
+          - "Rancher has been successfully deployed!"
+          - "----------------------------------------"
+          - "Ingress Access (if configured):"
+          - "  URL: https://{{ rancher_hostname }}"
+          - "  Add to hosts file: {{ node_ip.stdout }} {{ rancher_hostname }}"
+          - "----------------------------------------"
+          - "NodePort Access (if configured):"
+          - "  URL: https://{{ node_ip.stdout }}:{{ nodeport_result.stdout|default('') }}"
+          - "----------------------------------------"
+          - "Initial credentials:"
+          - "  Username: admin"
+          - "  Password: {{ rancher_admin_password }}"
