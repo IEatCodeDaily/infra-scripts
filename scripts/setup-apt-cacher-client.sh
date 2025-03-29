@@ -37,22 +37,25 @@ if [ "$(id -u)" -ne 0 ]; then
     exit 1
 fi
 
-# Check if curl is installed, install it if not
-info "Checking if curl is installed..."
-if ! command -v curl &> /dev/null; then
-    warning "curl not found. Installing curl..."
-    apt-get update
-    apt-get install -y curl
-    if ! command -v curl &> /dev/null; then
-        error "Failed to install curl. Continuing without connection test..."
-        CURL_INSTALLED=false
-    else
-        success "curl installed successfully."
-        CURL_INSTALLED=true
-    fi
+# Check if curl or wget is installed
+info "Checking for HTTP client tools..."
+if command -v curl &> /dev/null; then
+    info "curl is available."
+    HTTP_CLIENT="curl"
+elif command -v wget &> /dev/null; then
+    info "wget is available."
+    HTTP_CLIENT="wget"
 else
-    info "curl is already installed."
-    CURL_INSTALLED=true
+    warning "Neither curl nor wget found. Installing wget..."
+    apt-get update
+    apt-get install -y wget
+    if command -v wget &> /dev/null; then
+        success "wget installed successfully."
+        HTTP_CLIENT="wget"
+    else
+        error "Failed to install wget. Continuing without connection test..."
+        HTTP_CLIENT="none"
+    fi
 fi
 
 # Default IP address of the apt-cacher server
@@ -83,7 +86,7 @@ Acquire::http::Proxy "http://$PROXY_IP:3142";
 EOF
 
 info "Testing connection to apt-cacher..."
-if [ "$CURL_INSTALLED" = true ]; then
+if [ "$HTTP_CLIENT" = "curl" ]; then
     if curl -s --connect-timeout 5 http://$PROXY_IP:3142 > /dev/null; then
         success "Connection to apt-cacher successful!"
     else
@@ -91,8 +94,16 @@ if [ "$CURL_INSTALLED" = true ]; then
         warning "Please check if the server is running and accessible."
         warning "The proxy configuration has been set up, but may not work until the server is reachable."
     fi
+elif [ "$HTTP_CLIENT" = "wget" ]; then
+    if wget -q --timeout=5 --spider http://$PROXY_IP:3142; then
+        success "Connection to apt-cacher successful!"
+    else
+        warning "Could not connect to apt-cacher at $PROXY_IP:3142"
+        warning "Please check if the server is running and accessible."
+        warning "The proxy configuration has been set up, but may not work until the server is reachable."
+    fi
 else
-    warning "Skipping connection test as curl is not available."
+    warning "Skipping connection test as neither curl nor wget is available."
     warning "Please verify manually that the apt-cacher at $PROXY_IP:3142 is accessible."
 fi
 
