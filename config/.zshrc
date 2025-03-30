@@ -4,10 +4,10 @@
 export ZSH="$HOME/.oh-my-zsh"
 
 # Set theme
-ZSH_THEME="jonathan"
+ZSH_THEME="wedisagree"
 
 # Enable command correction
-ENABLE_CORRECTION="true"
+ENABLE_CORRECTION="false"
 
 # Display red dots while waiting for completion
 COMPLETION_WAITING_DOTS="true"
@@ -72,3 +72,18 @@ setopt autocd
 # Key bindings - simple version less likely to cause encoding issues
 bindkey '^[[A' up-line-or-search
 bindkey '^[[B' down-line-or-search
+
+# Start SSH agent if not already running
+if [ -z "$SSH_AUTH_SOCK" ]; then
+  eval "$(ssh-agent -s)" > /dev/null
+fi
+
+# Add all keys in ~/.ssh/keys directory
+if [ -d "$HOME/.ssh/keys" ]; then
+  for key in "$HOME"/.ssh/keys/*; do
+    # Only add private keys that don't have .pub extension
+    if [ -f "$key" ] && [[ "$key" != *.pub ]]; then
+      ssh-add "$key" 2>/dev/null
+    fi
+  done
+fi
