@@ -1,0 +1,27 @@
+
+authentik:
+    secret_key: "oBo2JUaJM7cLQyc+XfUiU9pkCtL1FEBwvzP0Fk6AgWV9T8I5JWH5+S9VEgepN4VXlPBVxImSKmjo67Rj"
+    # This sends anonymous usage-data, stack traces on errors and
+    # performance data to sentry.io, and is fully opt-in
+    error_reporting:
+        enabled: true
+    postgresql:
+        password: "postgresqlauthentiklongasspasswordyea"
+
+server:
+    ingress:
+        # Specify kubernetes ingress controller class name
+        ingressClassName: traefik
+        enabled: true
+        hosts:
+            - authentik.k3s.home
+            - authentik.home
+            - authentik.internal.entelechia.cloud
+            - authentik.entelechia.cloud
+
+postgresql:
+    enabled: true
+    auth:
+        password: "postgresqlauthentiklongasspasswordyea"
+redis:
+    enabled: true
