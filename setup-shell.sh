@@ -21,8 +21,10 @@ fi
 # Get the username of the user who called sudo
 if [ -n "$SUDO_USER" ]; then
     USER_HOME=$(eval echo ~$SUDO_USER)
+    ACTUAL_USER=$SUDO_USER
 else
     USER_HOME=$HOME
+    ACTUAL_USER=$(whoami)
 fi
 
 # Fix GPG key issues and update package lists
@@ -149,6 +151,14 @@ if ! grep -q "alias fm='ranger'" "${USER_HOME}/.zshrc"; then
     echo "alias fm='ranger'" >> "${USER_HOME}/.zshrc"
 fi
 
+# Add neofetch to the end of .zshrc to run it on every terminal start
+if ! grep -q "# Run neofetch on startup" "${USER_HOME}/.zshrc"; then
+    print_message "Adding neofetch to startup in .zshrc..."
+    echo "" >> "${USER_HOME}/.zshrc"
+    echo "# Run neofetch on startup" >> "${USER_HOME}/.zshrc"
+    echo "neofetch" >> "${USER_HOME}/.zshrc"
+fi
+
 # If any download fails, use local default config
 if [ ! -f "${USER_HOME}/.zshrc" ]; then
     print_message "Failed to download .zshrc, using local default..."
@@ -226,6 +236,9 @@ setopt autocd
 bindkey '^[[A' up-line-or-search
 bindkey '^[[B' down-line-or-search
 bindkey '^[[Z' reverse-menu-complete
+
+# Run neofetch on startup
+neofetch
 EOL
 fi
 
@@ -247,6 +260,27 @@ else
     chsh -s $(which zsh)
 fi
 
-print_message "Installation complete! Log out and log back in to start using zsh."
-print_message "Or run the following command to start zsh now: exec zsh"
-print_message "To use the ranger file manager, type 'fm' or 'ranger'"
+print_message "Installation complete!"
+print_message "Starting zsh with neofetch now..."
+
+# Create a temporary script to launch zsh with neofetch for the current session
+TMP_SCRIPT=$(mktemp)
+cat > $TMP_SCRIPT << EOL
+#!/bin/bash
+neofetch
+exec zsh
+EOL
+
+chmod +x $TMP_SCRIPT
+
+# Launch zsh for the user
+if [ -n "$SUDO_USER" ]; then
+    print_message "Switching to user $SUDO_USER and launching zsh..."
+    su - $SUDO_USER -c "$TMP_SCRIPT"
+else
+    # Run directly
+    bash $TMP_SCRIPT
+fi
+
+# Clean up
+rm -f $TMP_SCRIPT
