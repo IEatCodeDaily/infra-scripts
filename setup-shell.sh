@@ -156,8 +156,8 @@ if [ ! -f "${USER_HOME}/.zshrc" ]; then
 # Path to Oh My Zsh installation
 export ZSH="$HOME/.oh-my-zsh"
 
-# Set theme - agnoster is a nice built-in theme with powerline-like features
-ZSH_THEME="agnoster"
+# Set theme
+ZSH_THEME="xiong-chiamiov-plus"
 
 # Enable command correction
 ENABLE_CORRECTION="true"
