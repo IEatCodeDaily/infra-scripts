@@ -1,0 +1,89 @@
+---
+# Playbook to format disks with XFS and prepare them for Longhorn
+- name: Format disks and prepare for Longhorn
+  hosts: longhorn  # Change this to match your inventory group name
+  become: true      # Run tasks with sudo
+  vars:
+    disk_device: /dev/sdb      # The disk device to format
+    mount_point: /mnt/longhorn-disk  # Where to mount the disk
+    filesystem: xfs             # Filesystem type
+    disk_owner: 1000            # UID for disk ownership
+    disk_group: 1000            # GID for disk ownership
+  
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+      when: ansible_os_family == "Debian"
+      
+    - name: Install xfsprogs package
+      apt:
+        name: xfsprogs
+        state: present
+      when: ansible_os_family == "Debian"
+    - name: Get disk information
+      command: lsblk -no NAME,SIZE,TYPE,MOUNTPOINT {{ disk_device }}
+      register: disk_info
+      changed_when: false
+      
+    - name: Display disk information
+      debug:
+        msg: "Current disk info: {{ disk_info.stdout }}"
+      
+    - name: Check if disk is already mounted
+      command: findmnt {{ disk_device }}
+      register: mount_check
+      changed_when: false
+      failed_when: false
+    
+    - name: Unmount if already mounted
+      mount:
+        path: "{{ mount_check.stdout_lines[0].split(' ')[0] }}"
+        state: unmounted
+      when: mount_check.rc == 0
+
+    - name: Format the disk with XFS
+      filesystem:
+        dev: "{{ disk_device }}"
+        fstype: "{{ filesystem }}"
+        force: yes
+      when: mount_check.rc != 0 or (mount_check.rc == 0 and "lvm" not in disk_info.stdout)
+      register: format_result
+      
+    - name: Create mount point directory
+      file:
+        path: "{{ mount_point }}"
+        state: directory
+        owner: "{{ disk_owner }}"
+        group: "{{ disk_group }}"
+        mode: '0755'
+        
+    - name: Add entry to fstab
+      lineinfile:
+        path: /etc/fstab
+        line: "{{ disk_device }} {{ mount_point }} {{ filesystem }} defaults 0 0"
+        state: present
+        
+    - name: Mount the filesystem
+      mount:
+        path: "{{ mount_point }}"
+        src: "{{ disk_device }}"
+        fstype: "{{ filesystem }}"
+        state: mounted
+        
+    - name: Verify disk is mounted
+      command: df -h {{ mount_point }}
+      register: df_output
+      changed_when: false
+      
+    - name: Set appropriate permissions on mount point
+      file:
+        path: "{{ mount_point }}"
+        state: directory
+        owner: "{{ disk_owner }}"
+        group: "{{ disk_group }}"
+        mode: '0755'
+      
+    - name: Display mount information
+      debug:
+        msg: "{{ df_output.stdout }}"
