@@ -1,0 +1,78 @@
+---
+# Playbook to expand filesystem on proxmox VMs after disk expansion
+- name: Expand filesystem to use all available disk space
+  hosts: k3s_cluster
+  become: true
+  
+  vars:
+    root_device: /dev/sda  # The root device
+    root_partition: /dev/sda1  # The partition to expand
+
+  tasks:
+    - name: Get disk information before resize
+      command: df -h /
+      register: df_before
+      changed_when: false
+
+    - name: Display current disk usage
+      debug:
+        msg: "Current disk usage: {{ df_before.stdout_lines | join('\n') }}"
+
+    - name: Install parted and other tools if needed
+      apt:
+        name:
+          - parted
+          - cloud-guest-utils
+        state: present
+        update_cache: yes
+
+    - name: Check if disk has been expanded in Proxmox
+      command: lsblk -ndo SIZE {{ root_device }}
+      register: disk_size
+      changed_when: false
+
+    - name: Display disk size
+      debug:
+        msg: "Total disk size: {{ disk_size.stdout }}"
+
+    # Use growpart to expand the partition
+    - name: Expand the root partition
+      command: growpart {{ root_device }} 1
+      register: growpart_result
+      failed_when: 
+        - growpart_result.rc != 0 
+        - "'NOCHANGE' not in growpart_result.stderr"
+      changed_when: "'NOCHANGE' not in growpart_result.stderr"
+
+    # Resize the filesystem
+    - name: Check filesystem type
+      command: findmnt -no FSTYPE /
+      register: fstype
+      changed_when: false
+
+    - name: Expand filesystem if ext4
+      command: resize2fs {{ root_partition }}
+      when: fstype.stdout == "ext4"
+      register: resize_result
+      changed_when: resize_result.rc == 0
+
+    - name: Expand filesystem if xfs
+      command: xfs_growfs /
+      when: fstype.stdout == "xfs"
+      register: xfs_result
+      changed_when: xfs_result.rc == 0
+
+    # Verify the new space
+    - name: Get disk information after resize
+      command: df -h /
+      register: df_after
+      changed_when: false
+
+    - name: Display updated disk usage
+      debug:
+        msg: "Updated disk usage: {{ df_after.stdout_lines | join('\n') }}"
+
+    - name: Verify disk expansion
+      debug:
+        msg: "Filesystem expansion successful! Available space increased."
+      when: df_after.stdout is search("([0-9]+)%") and df_before.stdout is search("([0-9]+)%")

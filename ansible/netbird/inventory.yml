@@ -1,0 +1,12 @@
+all:
+  hosts:
+    netbird.entelechia.cloud: 
+      ansible_host: 15.235.141.39
+
+netbird:
+  hosts:
+    netbird.entelechia.cloud:
+
+vars:
+  ansible_port: 22
+  ansible_user: debian

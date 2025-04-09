@@ -1,0 +1,75 @@
+---
+# proxmox_sdn_requirements.yml - Install prerequisites for Proxmox SDN based on official docs
+# This playbook only installs the requirements and doesn't configure SDN
+
+- name: Install Proxmox SDN Requirements
+  hosts: pve_nodes  
+  become: true
+  gather_facts: true
+  
+  vars:
+    install_dhcp_ipam: true    # Set to true if you want to install DHCP IPAM components
+    install_frrouting: true    # Set to true if you want to install FRRouting components
+  
+  tasks:
+    # Core SDN Installation
+    - name: Check Proxmox VE version
+      shell: pveversion | grep -o 'pve-manager/[0-9]\+\.[0-9]\+' | cut -d'/' -f2
+      register: pve_version
+      changed_when: false
+      
+    - name: Show detected Proxmox VE version
+      debug:
+        var: pve_version.stdout
+      
+    - name: Install libpve-network-perl package (for older versions)
+      apt:
+        name: libpve-network-perl
+        state: present
+        update_cache: yes
+      when: pve_version.stdout is version('8.1', '<')
+      
+    - name: Install ifupdown2 package (if needed for very old versions)
+      apt:
+        name: ifupdown2
+        state: present
+      when: pve_version.stdout is version('7.0', '<')
+      
+    - name: Ensure /etc/network/interfaces includes interfaces.d directory
+      lineinfile:
+        path: /etc/network/interfaces
+        line: "source /etc/network/interfaces.d/*"
+        state: present
+    
+    # DHCP IPAM Installation (Optional)
+    - name: Install DHCP IPAM requirements (dnsmasq)
+      block:
+        - name: Install dnsmasq package
+          apt:
+            name: dnsmasq
+            state: present
+            
+        - name: Disable default dnsmasq instance
+          systemd:
+            name: dnsmasq
+            enabled: false
+            state: stopped
+      when: install_dhcp_ipam | bool
+    
+    # FRRouting Installation (Optional)
+    - name: Install FRRouting requirements
+      block:
+        - name: Install frr-pythontools package
+          apt:
+            name: frr-pythontools
+            state: present
+            
+        - name: Enable frr service
+          systemd:
+            name: frr
+            enabled: true
+      when: install_frrouting | bool
+      
+    - name: Verify SDN requirements installation
+      debug:
+        msg: "Basic SDN requirements installed successfully. Additional components (DHCP IPAM: {{ install_dhcp_ipam }}, FRRouting: {{ install_frrouting }}) have been installed based on your configuration."
