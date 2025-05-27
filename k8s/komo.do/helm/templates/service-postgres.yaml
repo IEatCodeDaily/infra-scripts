@@ -1,10 +1,10 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "komodo-helm-chart.fullname" . }}-postgres
+  name: {{ include "komodo.fullname" . }}-postgres
   labels:
-    app: {{ include "komodo-helm-chart.name" . }}
-    chart: {{ include "komodo-helm-chart.chart" . }}
+    app: {{ include "komodo.name" . }}
+    chart: {{ include "komodo.chart" . }}
     release: {{ .Release.Name }}
     heritage: {{ .Release.Service }}
 spec:
@@ -15,4 +15,4 @@ spec:
       protocol: TCP
       name: postgres
   selector:
-    app: {{ include "komodo-helm-chart.fullname" . }}-postgres
+    app: {{ include "komodo.fullname" . }}-postgres

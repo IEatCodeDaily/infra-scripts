@@ -12,7 +12,7 @@ This Helm chart deploys the Komodo application with a PostgreSQL backend, includ
 To install the Komodo Helm chart, use the following command:
 
 ```bash
-helm install <release-name> ./komodo-helm-chart
+helm install <release-name> ./komodo
 ```
 
 Replace `<release-name>` with your desired release name.
@@ -32,7 +32,7 @@ The following configuration options are available in the `values.yaml` file:
 To upgrade an existing release, use the following command:
 
 ```bash
-helm upgrade <release-name> ./komodo-helm-chart
+helm upgrade <release-name> ./komodo
 ```
 
 ## Uninstallation
