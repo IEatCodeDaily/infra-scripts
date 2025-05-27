@@ -1,0 +1,5 @@
+apiVersion: v2
+name: komodo
+description: A Helm chart for deploying Komodo with a PostgreSQL backend
+version: 0.1.0
+appVersion: "latest"

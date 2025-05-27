@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: komodo-core
+  labels:
+    app: komodo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: komodo
+      component: core
+  template:
+    metadata:
+      labels:
+        app: komodo
+        component: core
+    spec:
+      containers:
+        - name: komodo-core
+          image: {{ .Values.komodo.image.repository }}:{{ .Values.komodo.image.tag }}
+          ports:
+            - containerPort: 9120
+          env:
+            - name: KOMODO_DATABASE_URI
+              value: "mongodb://{{ .Values.komodo.db.username }}:{{ .Values.komodo.db.password }}@ferretdb:27017/{{ .Values.komodo.db.name }}"
+            - name: KOMODO_PASSKEY
+              valueFrom:
+                secretKeyRef:
+                  name: komodo-secret
+                  key: komodo-passkey
+            - name: KOMODO_HOST
+              value: {{ .Values.komodo.host }}
+            - name: KOMODO_TITLE
+              value: {{ .Values.komodo.title }}
+            - name: TZ
+              value: {{ .Values.timezone }}
+          volumeMounts:
+            - name: repo-cache
+              mountPath: /repo-cache
+      volumes:
+        - name: repo-cache
+          persistentVolumeClaim:
+            claimName: repo-cache-pvc
+      restartPolicy: Always
+      imagePullSecrets:
+        - name: {{ .Values.imagePullSecret }}

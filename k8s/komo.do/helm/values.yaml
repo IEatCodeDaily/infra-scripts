@@ -1,0 +1,60 @@
+# Default configuration values for the Komodo Helm chart
+
+# Image settings
+image:
+  repository: ghcr.io/moghtech/komodo-core
+  tag: latest
+
+ferretdb:
+  image:
+    repository: ghcr.io/ferretdb/ferretdb
+    tag: 1
+
+postgres:
+  image:
+    repository: postgres
+    tag: 17
+  username: admin
+  password: admin
+  database: komodo
+
+# Persistent volume claims
+pvc:
+  postgres:
+    enabled: true
+    size: 1Gi
+  repoCache:
+    enabled: true
+    size: 1Gi
+
+# Komodo Core environment variables
+komodo:
+  host: https://demo.komo.do
+  title: Komodo
+  firstServer: https://periphery:8120
+  monitoringInterval: "15-sec"
+  resourcePollInterval: "5-min"
+  localAuth: true
+  disableUserRegistration: false
+  enableNewUsers: false
+  disableNonAdminCreate: false
+  transparentMode: false
+  jwtTTL: "1-day"
+  passkey: a_random_passkey
+  webhookSecret: a_random_secret
+  jwtSecret: a_random_jwt_secret
+
+# Time zone
+timezone: Etc/UTC
+
+# Periphery settings
+periphery:
+  rootDirectory: /etc/komodo
+  sslEnabled: true
+  disableTerminals: false
+
+# Logging settings
+logging:
+  driver: local
+
+# Additional settings can be added as needed.

@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "komodo-helm-chart.fullname" . }}-postgres
+  labels:
+    app: {{ include "komodo-helm-chart.name" . }}
+    chart: {{ include "komodo-helm-chart.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ include "komodo-helm-chart.name" . }}
+      tier: postgres
+  template:
+    metadata:
+      labels:
+        app: {{ include "komodo-helm-chart.name" . }}
+        tier: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: "postgres:17"
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "komodo-helm-chart.fullname" . }}-secret
+                  key: db-username
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "komodo-helm-chart.fullname" . }}-secret
+                  key: db-password
+            - name: POSTGRES_DB
+              value: {{ .Values.database.name | quote }}
+          ports:
+            - containerPort: 5432
+          volumeMounts:
+            - name: pg-data
+              mountPath: /var/lib/postgresql/data
+      volumes:
+        - name: pg-data
+          persistentVolumeClaim:
+            claimName: {{ include "komodo-helm-chart.fullname" . }}-pvc-postgres

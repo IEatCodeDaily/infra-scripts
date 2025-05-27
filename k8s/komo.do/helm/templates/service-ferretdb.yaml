@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "komodo-helm-chart.fullname" . }}-ferretdb
+  labels:
+    app: {{ include "komodo-helm-chart.name" . }}
+    chart: {{ include "komodo-helm-chart.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: 27017
+      targetPort: 27017
+      protocol: TCP
+      name: http
+  selector:
+    app: {{ include "komodo-helm-chart.name" . }}
+    component: ferretdb

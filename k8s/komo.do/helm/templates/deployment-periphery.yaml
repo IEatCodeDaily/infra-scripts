@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: komodo-periphery
+  labels:
+    app: komodo
+    component: periphery
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: komodo
+      component: periphery
+  template:
+    metadata:
+      labels:
+        app: komodo
+        component: periphery
+    spec:
+      containers:
+        - name: periphery
+          image: ghcr.io/moghtech/komodo-periphery:{{ .Values.image.tag | default "latest" }}
+          env:
+            - name: KOMODO_PASSKEY
+              valueFrom:
+                secretKeyRef:
+                  name: komodo-secrets
+                  key: komodo_passkey
+            - name: PERIPHERY_ROOT_DIRECTORY
+              value: {{ .Values.periphery.rootDirectory | default "/etc/komodo" }}
+            - name: KOMODO_HOST
+              value: {{ .Values.komodo.host | default "https://demo.komo.do" }}
+          volumeMounts:
+            - name: docker-socket
+              mountPath: /var/run/docker.sock
+            - name: proc
+              mountPath: /proc
+            - name: periphery-root
+              mountPath: {{ .Values.periphery.rootDirectory | default "/etc/komodo" }}
+      volumes:
+        - name: docker-socket
+          hostPath:
+            path: /var/run/docker.sock
+        - name: proc
+          hostPath:
+            path: /proc
+        - name: periphery-root
+          emptyDir: {}

@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: komodo-config
+data:
+  KOMODO_DB_USERNAME: {{ .Values.db.username }}
+  KOMODO_DB_PASSWORD: {{ .Values.db.password }}
+  KOMODO_DATABASE_DB_NAME: {{ .Values.db.database }}
+  KOMODO_PASSKEY: {{ .Values.passkey }}
+  KOMODO_HOST: {{ .Values.host }}
+  KOMODO_TITLE: {{ .Values.title }}
+  KOMODO_FIRST_SERVER: {{ .Values.firstServer }}
+  KOMODO_MONITORING_INTERVAL: {{ .Values.monitoringInterval }}
+  KOMODO_RESOURCE_POLL_INTERVAL: {{ .Values.resourcePollInterval }}
+  KOMODO_WEBHOOK_SECRET: {{ .Values.webhookSecret }}
+  KOMODO_JWT_SECRET: {{ .Values.jwtSecret }}
+  PERIPHERY_ROOT_DIRECTORY: {{ .Values.periphery.rootDirectory }}
+  PERIPHERY_PASSKEYS: {{ .Values.passkey }}
